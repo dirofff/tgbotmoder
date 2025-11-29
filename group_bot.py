@@ -2,7 +2,7 @@ from telegram import Update, ChatPermissions
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from datetime import datetime, timedelta
 
-TOKEN = "8552286080:AAHyr9PzZhzZ3RD8l5Sh8GU7I0F9Xtzmbss"
+TOKEN = ""
 
 # Словари для подсчета сообщений
 message_counts_total = {}   # {user_id: total_messages}
@@ -141,5 +141,6 @@ if __name__ == "__main__":
 
     print("Бот запущен...")
     app.run_polling()
+
 
 
