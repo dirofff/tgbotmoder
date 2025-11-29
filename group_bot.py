@@ -8,8 +8,8 @@ TOKEN = "8552286080:AAHyr9PzZhzZ3RD8l5Sh8GU7I0F9Xtzmbss"
 message_counts_total = {}   # {user_id: total_messages}
 message_counts_today = {}   # {user_id: {date_string: count}}
 
-# Словарь с предупреждениями
-warnings = {}  # {user_id: warning_count}
+# Словарь для хранения ID сообщений
+user_messages = {}  # {user_id: [message_ids]}
 
 # --- Команды ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22,7 +22,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/kick - кикнуть пользователя\n"
         "/ban - забанить пользователя\n"
         "/admins - показать администраторов\n"
-        "/stats - показать статистику сообщений"
+        "/stats - показать статистику сообщений\n"
+        "/delall - удалить все сообщения пользователя за всё время"
     )
     await update.message.reply_text(help_text)
 
@@ -76,18 +77,49 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today_count = message_counts_today.get(user.id, {}).get(today, 0)
     await update.message.reply_text(f"Сообщений всего: {total}\nСообщений сегодня: {today_count}")
 
+# --- Удаление всех сообщений пользователя ---
+async def delete_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Ответь на сообщение пользователя, чьи сообщения нужно удалить.")
+        return
+
+    user = update.message.reply_to_message.from_user
+    chat = update.message.chat
+    user_id = user.id
+
+    if user_id not in user_messages or not user_messages[user_id]:
+        await update.message.reply_text("Нет сохранённых сообщений этого пользователя.")
+        return
+
+    deleted = 0
+    for msg_id in user_messages[user_id]:
+        try:
+            await chat.delete_message(msg_id)
+            deleted += 1
+        except:
+            pass
+
+    user_messages[user_id] = []
+
+    await update.message.reply_text(f"Удалено сообщений: {deleted}")
+
 # --- Отслеживание сообщений ---
 async def count_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     today = datetime.now().strftime("%Y-%m-%d")
-    
+
     # Общий счет
     message_counts_total[user.id] = message_counts_total.get(user.id, 0) + 1
-    
+
     # За сегодня
     if user.id not in message_counts_today:
         message_counts_today[user.id] = {}
     message_counts_today[user.id][today] = message_counts_today[user.id].get(today, 0) + 1
+
+    # Сохраняем ID сообщений
+    if user.id not in user_messages:
+        user_messages[user.id] = []
+    user_messages[user.id].append(update.message.message_id)
 
 # --- Запуск бота ---
 if __name__ == "__main__":
@@ -102,10 +134,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("admins", admins))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("delall", delete_all_messages))
 
     # Отслеживание всех сообщений
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), count_messages))
 
-    # Запуск polling без asyncio.run()
     print("Бот запущен...")
     app.run_polling()
